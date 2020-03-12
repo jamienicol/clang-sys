@@ -69,7 +69,11 @@ macro_rules! link {
 
         /// Returns whether a `libclang` shared library is loaded on this thread.
         pub fn is_loaded() -> bool {
-            LIBRARY.with(|l| l.borrow().is_some())
+            println!("{}", "clang_sys: is_loaded()");
+            LIBRARY.with(|l| {
+                println!("{}", "clang_sys: thread local is_loaded()");
+                l.borrow().is_some()
+            })
         }
 
         fn with_library<T, F>(f: F) -> Option<T> where F: FnOnce(&SharedLibrary) -> T {
@@ -116,12 +120,16 @@ macro_rules! link {
         /// * a `libclang` shared library could not be found
         /// * the `libclang` shared library could not be opened
         pub fn load_manually() -> Result<SharedLibrary, String> {
+            println!("{}", "clang_sys: load_manually()");
+
             mod build {
                 pub mod common { include!(concat!(env!("OUT_DIR"), "/common.rs")); }
                 pub mod dynamic { include!(concat!(env!("OUT_DIR"), "/dynamic.rs")); }
             }
 
             let (directory, filename) = try!(build::dynamic::find(true));
+            println!("clang_sys: dynamic found {} {}", directory.display(), filename);
+            
             let path = directory.join(filename);
 
             let library = libloading::Library::new(&path).map_err(|e| {
@@ -131,9 +139,11 @@ macro_rules! link {
                     e,
                 )
             });
-
+            println!("{}", "clang_sys: loaded library");
             let mut library = SharedLibrary::new(try!(library), path);
+            println!("{}", "clang_sys: created shared library");
             $(load::$name(&mut library);)+
+                println!("{}", "clang_sys: what does this mean");
             Ok(library)
         }
 
@@ -150,8 +160,13 @@ macro_rules! link {
         /// * the `libclang` shared library could not be opened
         #[allow(dead_code)]
         pub fn load() -> Result<(), String> {
+            println!("{}", "clang_sys: load()");
             let library = Arc::new(try!(load_manually()));
-            LIBRARY.with(|l| *l.borrow_mut() = Some(library));
+            println!("{}", "clang_sys: load_manually complete");
+            LIBRARY.with(|l| {
+                println!("{}", "clang_sys: thread local load()");
+                *l.borrow_mut() = Some(library)
+            });
             Ok(())
         }
 
@@ -173,14 +188,22 @@ macro_rules! link {
         ///
         /// This functions allows for sharing library instances between threads.
         pub fn get_library() -> Option<Arc<SharedLibrary>> {
-            LIBRARY.with(|l| l.borrow_mut().clone())
+            println!("{}", "clang_sys: get_library()");
+            LIBRARY.with(|l| {
+                println!("{}", "clang_sys: thread local get_library()");
+                l.borrow_mut().clone()
+            })
         }
 
         /// Sets the library instance stored in TLS and returns the previous library.
         ///
         /// This functions allows for sharing library instances between threads.
         pub fn set_library(library: Option<Arc<SharedLibrary>>) -> Option<Arc<SharedLibrary>> {
-            LIBRARY.with(|l| mem::replace(&mut *l.borrow_mut(), library))
+            println!("{}", "clang_sys: set_library()");
+            LIBRARY.with(|l| {
+                println!("{}", "clang_sys: thread local set_library()");
+                mem::replace(&mut *l.borrow_mut(), library)
+            })
         }
     )
 }
